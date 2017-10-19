@@ -7,13 +7,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing;
 use Symfony\Component\HttpKernel;
 
-$controllerResolver = new HttpKernel\Controller\ControllerResolver();
-$argumentResolver = new HttpKernel\Controller\ArgumentResolver();
-
-
-
-
-function render_template($request)
+function render_template(Request $request)
 {
     extract($request->attributes->all(), EXTR_SKIP);
     ob_start();
@@ -29,13 +23,20 @@ $context = new Routing\RequestContext();
 $context->fromRequest($request);
 $matcher = new Routing\Matcher\UrlMatcher($routes, $context);
 
-$request->attributes->add($matcher->match($request->getPathInfo()));     
-$controller = $controllerResolver->getController($request);
+$controllerResolver = new HttpKernel\Controller\ControllerResolver();
+$argumentResolver = new HttpKernel\Controller\ArgumentResolver();
 
-$arguments = $argumentResolver->getArguments($request, $controller);
+try {
+    $request->attributes->add($matcher->match($request->getPathInfo()));
 
+    $controller = $controllerResolver->getController($request);
+    $arguments = $argumentResolver->getArguments($request, $controller);
 
-$response = call_user_func_array($controller, $arguments);
-    
+    $response = call_user_func_array($controller, $arguments);
+} catch (Routing\Exception\ResourceNotFoundException $e) {
+    $response = new Response('Not Found', 404);
+} catch (Exception $e) {
+    $response = new Response('An error occurred', 500);
+}
 
 $response->send();
